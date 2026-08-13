@@ -1,0 +1,49 @@
+[workflow]
+max_review_cycles = 3
+prompt_timeout_ms = 300000
+read_lines = 500
+runtime_dir = ".agent-runtime"
+workspace_label = "agent-group"
+
+# Each role is independently configurable.
+#
+# kind:
+#   Herdr agent kind, e.g. codex or opencode.
+#
+# model:
+#   Passed to the agent CLI using model_flag. The value is intentionally not
+#   validated against a hard-coded model list.
+#
+# model_flag:
+#   Usually "-m" for Codex and OpenCode. Set to "" if a custom kind handles
+#   model selection entirely through launch_args.
+#
+# profile:
+#   For OpenCode only, an optional --agent profile name. It is ignored for
+#   non-OpenCode kinds.
+#
+# launch_args:
+#   Additional arguments passed verbatim to the agent executable after "--".
+#
+# Environment variables and launch.py CLI flags can override kind/model.
+
+[roles.lead]
+kind = "codex"
+model = "gpt-5.6"
+model_flag = "-m"
+profile = "agent-group-lead"
+launch_args = []
+
+[roles.reviewer]
+kind = "opencode"
+model = "deepseek/deepseek-v4-pro"
+model_flag = "-m"
+profile = "agent-group-reviewer"
+launch_args = ["--auto"]
+
+[roles.executor]
+kind = "opencode"
+model = "deepseek/deepseek-v4-flash"
+model_flag = "-m"
+profile = "agent-group-executor"
+launch_args = ["--auto"]
