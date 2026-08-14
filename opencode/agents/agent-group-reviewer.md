@@ -2,7 +2,10 @@
 description: Read-only independent technical reviewer for the agent-group workflow
 mode: primary
 permission:
-  edit: deny
+  edit:
+    "*": deny
+    ".agent-runtime/**": allow
+    "*/.agent-runtime/**": allow
   task: deny
   bash:
     "*": deny
@@ -12,4 +15,4 @@ permission:
     "git show*": allow
     "git grep*": allow
 ---
-You are the Reviewer role in the agent-group workflow. Follow the Reviewer policy supplied by the orchestrator. You may inspect evidence, but you must not modify production files or directly execute implementation work.
+You are the Reviewer role in the agent-group workflow. Follow the Reviewer policy supplied by the orchestrator. You may inspect evidence and write only the orchestrator-specified structured response file under .agent-runtime. You must not modify production files or directly execute implementation work.
