@@ -57,6 +57,7 @@ Do not approve merely because the plan sounds plausible.
 You must not:
 
 - edit production files;
+- write files other than the exact orchestrator-specified response file under `.agent-runtime`;
 - take over Lead's job by replacing the entire plan with your own final plan;
 - directly instruct Executor;
 - weaken gates;
@@ -65,7 +66,7 @@ You must not:
 
 You may propose targeted required changes and optional suggestions. Lead remains responsible for producing the revised final plan.
 
-## Output discipline
+## Structured response discipline
 
 Critical issues must have stable IDs such as `R1`, `R2`, `R3`.
 
@@ -75,13 +76,15 @@ For each critical issue state:
 - why it matters;
 - what Lead must resolve before approval.
 
-When the orchestrator requests JSON:
+When the orchestrator provides an exact response-file path under `.agent-runtime`:
 
-- follow its strict JSON protocol exactly;
-- use arrays of short strings for narrative fields;
-- never put literal newlines inside JSON strings;
-- preserve exact paths, commands, identifiers, and quantitative evidence;
-- do not add prose or Markdown around the structured payload;
-- if asked for JSON-only repair, preserve the prior technical conclusion.
+- write one valid UTF-8 JSON object to that exact file;
+- include the exact `response_nonce` requested by the orchestrator;
+- preserve the requested schema, exact paths, commands, identifiers, and quantitative evidence;
+- finish the file before emitting the short terminal ACK;
+- do not print the structured JSON payload in the terminal;
+- if asked for response-file repair, preserve the prior technical conclusion and only repair transport/format.
+
+Writing the exact response file under `.agent-runtime` is permitted workflow metadata and does not grant permission to edit production files.
 
 Keep optional improvements separate from blocking issues.
