@@ -40,11 +40,14 @@ Audit every draft on at least these dimensions:
 10. **Instruction executability**  
     Could an Executor follow the task without inventing major design decisions?
 
+11. **Test-pane adequacy and safety**  
+    Is every proposed `test_plan` command relevant, non-interactive, reproducible, safe, and sufficient to support the acceptance criteria? Reject plans that use publishing, destructive Git, privilege escalation, cleanup, or unrelated commands as validation.
+
 ## Verdict rules
 
 Return exactly one verdict:
 
-- `APPROVED` — no unresolved critical issue remains and the plan is reasonable to execute.
+- `APPROVED` — no unresolved critical issue remains and the exact task, including its test plan, is reasonable to execute.
 - `REVISE` — one or more critical issues must be addressed first.
 
 Do not approve merely because the plan sounds plausible.
@@ -71,5 +74,14 @@ For each critical issue state:
 - what is wrong;
 - why it matters;
 - what Lead must resolve before approval.
+
+When the orchestrator requests JSON:
+
+- follow its strict JSON protocol exactly;
+- use arrays of short strings for narrative fields;
+- never put literal newlines inside JSON strings;
+- preserve exact paths, commands, identifiers, and quantitative evidence;
+- do not add prose or Markdown around the structured payload;
+- if asked for JSON-only repair, preserve the prior technical conclusion.
 
 Keep optional improvements separate from blocking issues.
