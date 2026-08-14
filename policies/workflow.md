@@ -41,10 +41,10 @@ STOP
 3. The approved task includes its exact `test_plan`; changing it invalidates approval.
 4. Review cycles are bounded by `workflow.max_review_cycles`.
 5. Exhausting the review limit produces `ESCALATED`; execution is blocked.
-6. Lead and Reviewer are read-only with respect to production files.
+6. Lead and Reviewer are read-only with respect to production files. They may write only the exact orchestrator-specified response file under `.agent-runtime` for the current turn.
 7. Executor may edit production files but may not publish or destructively rewrite Git history.
 8. One invocation of `orchestrate.py` runs one engineering round.
-9. Structured output is validated strictly; malformed JSON may receive only bounded JSON-only repair, never semantic guessing.
+9. Structured response files are validated strictly; malformed JSON may receive only bounded format/transport repair, never semantic guessing.
 10. The orchestrator never auto-resets unexpected changes.
 11. After Executor returns, the orchestrator runs the sealed authoritative test plan in the dedicated Herdr test pane unless Executor reported `BLOCKED`.
 12. Test-pane validation commands must be non-interactive and must not publish, rewrite Git history, escalate privileges, or perform destructive system operations.
@@ -69,30 +69,37 @@ Owns no technical judgment. It is a deterministic execution surface for the seal
 
 No role may self-approve work outside its authority.
 
-## Structured exchange
+## Herdr control plane and structured data plane
 
-Herdr `agent prompt --wait` and `agent read --source recent-unwrapped` remain the primary agent communication channel.
+Herdr remains the primary control plane for every agent turn:
 
-For state transitions, each agent must return exactly one compact JSON payload inside:
+- `herdr agent prompt` delivers the task;
+- `--wait` / lifecycle state controls turn completion;
+- `herdr agent read --source recent-unwrapped` captures terminal evidence for audit and debugging;
+- the short terminal ACK identifies the completed turn.
+
+Full-screen coding-agent TUIs may insert renderer line breaks into displayed text. Therefore state-transition JSON is **not reconstructed from terminal rendering**.
+
+For each turn, the orchestrator creates a unique response path under the ignored project runtime directory, for example:
 
 ```text
-<AGENT_GROUP_JSON>
-{"response_nonce":"...","...":"..."}
-</AGENT_GROUP_JSON>
+.agent-runtime/rounds/<round>/transport/lead-draft-v1.json
 ```
 
-The transport protocol requires:
+The agent must:
 
-- RFC 8259 JSON;
-- one minified JSON object;
-- a per-turn `response_nonce` to prevent stale terminal history from satisfying a new turn;
-- arrays of short strings instead of paragraph-length strings;
-- no literal newlines inside JSON strings;
-- no Markdown fences, comments, or prose around the sentinel block.
+1. write one valid UTF-8 RFC 8259 JSON object to that exact response file;
+2. include the exact per-turn `response_nonce` supplied by the orchestrator;
+3. finish the whole file before signaling completion;
+4. emit only a short terminal ACK such as `<AG_READY:0123456789abcdef>` after the file is complete.
 
-The descriptive schemas shown in prompts use `<AGENT_GROUP_SCHEMA>` rather than the response sentinel, so prompt history is not mistaken for an agent response.
+The response file is authoritative structured data. The terminal capture remains authoritative control/audit evidence, not a JSON transport layer.
 
-If the first response is malformed but the Herdr transport completed normally, the orchestrator may request a bounded JSON-only repair. The repair instruction explicitly forbids re-analysis or changing technical conclusions. If repair still fails, the round stops with parser diagnostics instead of guessing intent.
+The nonce prevents a stale response file or stale terminal history from satisfying a new turn. The orchestrator deletes the expected response file before each attempt and validates the nonce after loading it.
+
+If the first response file is missing or malformed but the Herdr transport completed normally, the orchestrator may request a bounded response-file repair. The repair instruction explicitly forbids re-analysis or changing technical conclusions. If repair still fails, the round stops with diagnostics instead of guessing intent.
+
+Because `.agent-runtime` is excluded from the production working-tree fingerprint, this narrowly scoped workflow-metadata write does not violate the Lead/Reviewer production read-only rule. Any production-file modification by Lead or Reviewer still aborts orchestration.
 
 ## Review loop
 
@@ -161,7 +168,7 @@ The final Lead verdict is one of:
 - `FAIL`;
 - `INCONCLUSIVE`.
 
-The final Lead response returns a structured `updated_state`; the orchestrator renders that structure into `.agent-runtime/CURRENT_STATE.md` for the next round, avoiding fragile multiline JSON strings.
+The final Lead response returns a structured `updated_state`; the orchestrator renders that structure into `.agent-runtime/CURRENT_STATE.md` for the next round.
 
 ## Future extension
 
