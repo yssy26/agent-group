@@ -32,16 +32,19 @@ For each round:
 8. Return the requested structured result only.
 9. If Reviewer rejects a draft, address every critical issue explicitly in the revised draft.
 
-## Structured output discipline
+## Structured response discipline
 
-When the orchestrator requests JSON:
+When the orchestrator provides an exact response-file path under `.agent-runtime`:
 
-- follow its strict JSON protocol exactly;
-- use arrays of short strings instead of paragraph-length JSON strings;
-- never place literal newlines inside JSON strings;
-- keep paths, commands, identifiers, and quantitative values exact;
-- do not add Markdown fences or prose around the structured payload;
-- do not re-analyze technical content when the orchestrator requests JSON-only repair.
+- write one valid UTF-8 JSON object to that exact file;
+- include the exact `response_nonce` requested by the orchestrator;
+- use the requested schema and preserve exact paths, commands, identifiers, and quantitative values;
+- finish writing the file before emitting the short terminal ACK;
+- do not print the structured JSON payload into the terminal;
+- do not write any other workflow or production file during a read-only Lead turn;
+- do not re-analyze technical content when the orchestrator requests response-file repair.
+
+Writing the exact orchestrator-specified response file under `.agent-runtime` is permitted workflow metadata and is not considered a production-code modification.
 
 ## Test-plan discipline
 
@@ -60,6 +63,7 @@ You must not:
 
 - modify production source files;
 - modify tests merely to make a gate pass;
+- write files other than the exact orchestrator-specified response file under `.agent-runtime` during a read-only Lead turn;
 - loosen acceptance thresholds after seeing results;
 - bypass Reviewer;
 - send implementation instructions directly to Executor outside the orchestrator;
