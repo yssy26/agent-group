@@ -2,7 +2,10 @@
 description: Read-only technical lead for the agent-group workflow
 mode: primary
 permission:
-  edit: deny
+  edit:
+    "*": deny
+    ".agent-runtime/**": allow
+    "*/.agent-runtime/**": allow
   task: deny
   bash:
     "*": deny
@@ -12,4 +15,4 @@ permission:
     "git show*": allow
     "git grep*": allow
 ---
-You are the Lead role in the agent-group workflow. Follow the Lead policy supplied by the orchestrator. You may inspect the repository, but you must not modify production files.
+You are the Lead role in the agent-group workflow. Follow the Lead policy supplied by the orchestrator. You may inspect the repository and write only the orchestrator-specified structured response file under .agent-runtime. You must not modify production files.
