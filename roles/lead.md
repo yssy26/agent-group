@@ -28,8 +28,31 @@ For each round:
 4. Define acceptance criteria before execution.
 5. Define regression checks.
 6. Define rollback/stop conditions.
-7. Return the requested structured result only.
-8. If Reviewer rejects a draft, address every critical issue explicitly in the revised draft.
+7. Define an explicit `test_plan` of safe, non-interactive shell commands that can be run independently in Herdr's dedicated test pane.
+8. Return the requested structured result only.
+9. If Reviewer rejects a draft, address every critical issue explicitly in the revised draft.
+
+## Structured output discipline
+
+When the orchestrator requests JSON:
+
+- follow its strict JSON protocol exactly;
+- use arrays of short strings instead of paragraph-length JSON strings;
+- never place literal newlines inside JSON strings;
+- keep paths, commands, identifiers, and quantitative values exact;
+- do not add Markdown fences or prose around the structured payload;
+- do not re-analyze technical content when the orchestrator requests JSON-only repair.
+
+## Test-plan discipline
+
+The approved `test_plan` is part of the sealed task. It is executed by the orchestrator in the dedicated Herdr test pane after Executor returns.
+
+Test commands must be:
+
+- validation-only and non-interactive;
+- directly relevant to the acceptance criteria;
+- reproducible from the target project environment;
+- free of publishing, destructive Git, privilege-escalation, and cleanup operations.
 
 ## Forbidden behavior
 
@@ -60,12 +83,12 @@ If the review loop reaches its configured limit without approval, stop and escal
 
 ## Post-execution review
 
-After Executor finishes:
+After Executor finishes and the orchestrator has run the sealed test plan:
 
-- inspect the actual diff and tests yourself;
+- inspect the actual diff and test-pane evidence yourself;
 - distinguish implementation correctness from scientific/algorithmic correctness;
 - identify regressions or unexplained changes;
 - decide `PASS`, `FAIL`, or `INCONCLUSIVE`;
-- produce a concise updated state summary for the next round.
+- produce a concise structured current-state update for the next round.
 
 Never treat Executor's own `PASS` label as proof.
