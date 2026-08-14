@@ -1,74 +1,65 @@
 # agent-group
 
-A configurable three-role engineering workflow for coding agents, coordinated by [Herdr](https://herdr.dev/).
+A configurable three-role engineering workflow coordinated by [Herdr](https://herdr.dev/).
 
-The workflow separates **technical judgment**, **independent review**, and **implementation**:
+The workflow separates **technical judgment**, **independent review**, **implementation**, and **authoritative command-line validation**:
 
 ```text
-User
-  |
-  v
-Lead
-  |
-  | draft plan
-  v
-Reviewer
-  |\
-  | \-- REVISE --> Lead --> Reviewer
-  |
-  \---- APPROVED
-          |
-          v
-       Executor
-          |
-          v
-        Lead
-   final evidence review
+User / project state
+        |
+        v
+Lead (plan)
+        |
+        v
+Reviewer ---- REVISE ----> Lead
+        |
+     APPROVED
+        |
+        v
+SHA-256 sealed task
+        |
+        v
+Executor (implementation)
+        |
+        v
+Herdr test pane (sealed tests)
+        |
+        v
+Lead (independent assessment)
 ```
 
-The key rule is a hard gate: **the Executor is never called unless the Reviewer has approved the exact task that will be executed.**
+The hard rule is unchanged: **Executor is never called unless Reviewer has approved the exact task that will be executed.** The approved task now also contains the exact authoritative `test_plan`.
 
-## Model-agnostic by design
+## Model-agnostic roles
 
-Roles are not tied to one model or one CLI.
+Each role has independent `kind`, `model`, `profile`, and launch arguments in `config/agents.toml`. The default configuration is:
 
-Each role has independent `kind`, `model`, `profile`, and launch arguments in `config/agents.toml`. You can therefore use, for example:
+```text
+Lead      = Codex    / GPT-5.6 Sol
+Reviewer  = OpenCode / DeepSeek V4 Pro
+Executor  = OpenCode / DeepSeek V4 Flash
+```
 
-- Lead = Codex / GPT-5.6
-- Reviewer = OpenCode / DeepSeek V4 Pro
-- Executor = OpenCode / DeepSeek V4 Flash
+Roles are not tied to those models. You can swap a role's runner or model without changing orchestration logic.
 
-and later switch to:
-
-- Lead = OpenCode / DeepSeek
-- Reviewer = Codex / another model
-- Executor = OpenCode / another model
-
-without changing the orchestration logic.
-
-Runtime overrides are also supported:
+Example runtime override:
 
 ```bash
-python scripts/launch.py \
+uv run --python 3.11 python scripts/launch.py \
   --project ~/TO-ANISOTROPIC \
   --lead-kind opencode \
   --lead-model deepseek/deepseek-v4-pro \
   --reviewer-kind codex \
-  --reviewer-model gpt-5.6 \
-  --executor-kind opencode \
-  --executor-model deepseek/deepseek-v4-flash
+  --reviewer-model gpt-5.6-sol
 ```
 
-Model strings are intentionally **not validated against a hard-coded allow-list**. The selected CLI/provider remains the source of truth.
-
-Changing a role's `kind` or `model` affects the **next launch**. An already-running interactive agent keeps its current model/session; launch a new Herdr session to change it cleanly.
+Model strings are deliberately not validated against a hard-coded allow-list; the selected CLI/provider is the source of truth.
 
 ## Repository layout
 
 ```text
 agent-group/
-├── config/
-│   └── agents.toml
+├── config/agents.toml
 ├── roles/
 │   ├── lead.md
 │   ├── reviewer.md
@@ -76,74 +67,82 @@ agent-group/
 ├── policies/
 │   ├── workflow.md
 │   └── git-policy.md
-├── opencode/
-│   └── agents/
-│       ├── agent-group-lead.md
-│       ├── agent-group-reviewer.md
-│       └── agent-group-executor.md
+├── opencode/agents/
+│   ├── agent-group-lead.md
+│   ├── agent-group-reviewer.md
+│   └── agent-group-executor.md
 ├── templates/
 │   ├── PROJECT_CHARTER.md
 │   └── CURRENT_STATE.md
-└── scripts/
-    ├── doctor.py
-    ├── install_opencode_profiles.py
-    ├── init_project.py
-    ├── launch.py
-    └── orchestrate.py
+├── scripts/
+│   ├── common.py
+│   ├── doctor.py
+│   ├── init_project.py
+│   ├── install_opencode_profiles.py
+│   ├── launch.py
+│   ├── orchestrate.py
+│   ├── round_prompts.py
+│   ├── structured_protocol.py
+│   └── test_pane.py
+└── tests/
+    └── test_orchestrate_protocol.py
 ```
 
 ## 1. Prerequisites
 
-Install Herdr on the host/WSL environment where the agents run, then install the relevant integrations:
+Run Herdr, Codex, and OpenCode in the same Linux/WSL environment. Install the Herdr integrations:
 
 ```bash
 herdr integration install codex
 herdr integration install opencode
+herdr integration status
 ```
 
-Install/configure whichever agent CLIs and model providers you intend to use.
-
-For OpenCode, confirm available model identifiers with:
+For OpenCode, confirm provider/model identifiers with:
 
 ```bash
 opencode models
 ```
 
-Herdr passes arguments after `--` directly to the selected agent CLI. OpenCode accepts models in `provider/model` form via `-m` / `--model`.
-
-## 2. Clone this workflow repo
+The workflow scripts require Python 3.11+ (`tomllib`). On Ubuntu 20.04, using `uv` avoids replacing the system Python:
 
 ```bash
-git clone https://github.com/yssy26/agent-group.git
-cd agent-group
+uv python install 3.11
 ```
 
-## 3. Install the optional OpenCode role profiles
-
-These profiles enforce role-level permissions independently of the model:
+## 2. Install OpenCode role profiles
 
 ```bash
-python scripts/install_opencode_profiles.py
+cd ~/agent-group
+uv run --python 3.11 python scripts/install_opencode_profiles.py
 ```
 
-They contain **no model setting**. This is deliberate: model selection remains in `config/agents.toml` or CLI overrides.
+The profiles contain no model IDs. They enforce role permissions independently of model selection:
 
-The profiles enforce:
+- Lead: read-only inspection;
+- Reviewer: read-only inspection;
+- Executor: edits allowed, publishing/destructive Git denied.
 
-- Lead: no edits; safe inspection only.
-- Reviewer: no edits; safe inspection only.
-- Executor: edits allowed; destructive/publishing Git commands denied.
+## 3. Configure models and workflow controls
 
-If a role is run with a non-OpenCode agent, the orchestration policy still applies, but tool-level permission enforcement depends on that agent's own permission system.
+Edit `config/agents.toml` when needed. Important workflow settings include:
 
-## 4. Configure role runners and models
+```toml
+[workflow]
+max_review_cycles = 3
+prompt_timeout_ms = 300000
+read_lines = 500
+structured_repair_attempts = 1
+test_output_tail_lines = 40
+test_stop_on_failure = true
+```
 
-Edit `config/agents.toml`:
+Default roles:
 
 ```toml
 [roles.lead]
 kind = "codex"
-model = "gpt-5.6"
+model = "gpt-5.6-sol"
 
 [roles.reviewer]
 kind = "opencode"
@@ -154,15 +153,14 @@ kind = "opencode"
 model = "deepseek/deepseek-v4-flash"
 ```
 
-You may change each role independently at any time.
-
-## 5. Initialize a target project
+## 4. Initialize a target Git project
 
 ```bash
-python scripts/init_project.py --project ~/TO-ANISOTROPIC
+uv run --python 3.11 python scripts/init_project.py \
+  --project ~/TO-ANISOTROPIC
 ```
 
-This creates a local, ignored runtime directory:
+This creates the local ignored runtime directory:
 
 ```text
 .agent-runtime/
@@ -171,128 +169,127 @@ This creates a local, ignored runtime directory:
 └── ...
 ```
 
-Fill in `PROJECT_CHARTER.md` and, when useful, seed `CURRENT_STATE.md`.
+`PROJECT_CHARTER.md` defines long-lived project goals, invariants, forbidden behavior, and validation philosophy. `CURRENT_STATE.md` records the confirmed current state and next focus. `.agent-runtime/` is added to `.git/info/exclude`, so the target repository's tracked `.gitignore` is not changed.
 
-The runtime directory is added to `.git/info/exclude`, so it does not modify the target project's tracked `.gitignore`.
-
-## 6. Launch the three agents through Herdr
+## 5. Check prerequisites
 
 ```bash
-python scripts/launch.py --project ~/TO-ANISOTROPIC
+uv run --python 3.11 python scripts/doctor.py \
+  --project ~/TO-ANISOTROPIC
 ```
 
-The launcher:
+Do not launch until `Doctor: OK`.
 
-1. creates a Herdr workspace,
-2. creates Lead / Reviewer / Executor panes plus a normal test pane,
-3. starts each configured agent with its configured model,
-4. writes the resolved agent names, pane IDs, kinds, and models to `.agent-runtime/session.json`.
+## 6. Launch Herdr workspace and roles
 
-The role names used by Herdr include a timestamp, so relaunching with different models does not collide with a still-live previous session.
-
-Use `--dry-run` to inspect the resolved configuration without starting anything.
-
-## 7. Run exactly one controlled development round
+First inspect the resolved launch configuration:
 
 ```bash
-python scripts/orchestrate.py --project ~/TO-ANISOTROPIC
+uv run --python 3.11 python scripts/launch.py \
+  --project ~/TO-ANISOTROPIC \
+  --dry-run
 ```
 
-A round is:
+Then launch:
 
-1. Lead inspects the project and returns a structured draft task.
-2. Reviewer audits the draft.
-3. If `REVISE`, the review is returned to Lead for revision.
-4. The review loop runs at most `max_review_cycles`.
-5. If `APPROVED`, the orchestrator canonicalizes and SHA-256 seals the approved task.
-6. Executor receives only that sealed approved task.
-7. Executor implements and tests.
-8. Lead independently reviews the actual repository state and execution evidence.
-9. The orchestrator writes the final assessment and updated current-state summary.
-10. The process stops.
+```bash
+uv run --python 3.11 python scripts/launch.py \
+  --project ~/TO-ANISOTROPIC
+```
 
-By default, this repository intentionally runs **one engineering round at a time**.
+The launcher creates four panes:
+
+```text
+┌──────────────────────┬──────────────────────┐
+│ Lead                 │ Reviewer             │
+│ coding agent         │ coding agent         │
+├──────────────────────┼──────────────────────┤
+│ Test pane            │ Executor             │
+│ ordinary shell       │ coding agent         │
+└──────────────────────┴──────────────────────┘
+```
+
+Live agent names, pane IDs, models, and `test_pane_id` are written to `.agent-runtime/session.json`. After a computer reboot, launch again because the persisted session file cannot resurrect dead Herdr processes.
+
+## 7. Run one controlled engineering round
+
+```bash
+uv run --python 3.11 python scripts/orchestrate.py \
+  --project ~/TO-ANISOTROPIC
+```
+
+One round is:
+
+1. Lead inspects project evidence and proposes a structured task plus exact `test_plan`.
+2. Reviewer audits the task, scope, acceptance criteria, and test commands.
+3. `REVISE` returns the critical issues to Lead; the loop is bounded.
+4. `APPROVED` causes the exact task (including tests) to be canonicalized and SHA-256 sealed.
+5. Executor receives only the sealed implementation task.
+6. Executor implements the approved scope and may run cheap developer checks.
+7. The orchestrator independently executes the sealed `test_plan` in the ordinary Herdr test pane using `pane run` + `pane wait-output`.
+8. Full test logs and exit codes are written to the round directory and summarized in `TEST_PANE_REPORT.json`.
+9. Lead independently inspects the actual diff, test-pane evidence, and regressions.
+10. Lead returns `PASS`, `FAIL`, or `INCONCLUSIVE`; the orchestrator renders the next `CURRENT_STATE.md`.
+
+## Herdr-native structured transport
+
+Agent communication remains Herdr-native:
+
+```text
+herdr agent prompt --wait
+        ↓
+herdr agent read --source recent-unwrapped
+        ↓
+strict JSON validation
+```
+
+The structured protocol was hardened for full-screen TUI agents:
+
+- response schema examples use `<AGENT_GROUP_SCHEMA>` so prompt history cannot masquerade as an answer;
+- the real answer uses one compact `<AGENT_GROUP_JSON>...</AGENT_GROUP_JSON>` block;
+- every turn carries a unique `response_nonce`, preventing stale terminal history from satisfying a new turn;
+- narrative fields use arrays of short strings rather than long multiline strings;
+- literal newlines inside JSON strings are forbidden;
+- a malformed response receives at most the configured number of **JSON-only repair** attempts, with explicit instructions not to re-analyze or change the technical conclusion;
+- persistent malformed output stops the round with parser diagnostics rather than guessing intent.
+
+This keeps Herdr `prompt/wait/read` as the primary control plane while making the structured hand-off substantially more robust.
+
+## Dedicated test pane
+
+The test pane is deliberately **not** an LLM agent. It is a deterministic execution surface with zero LLM token cost.
+
+The approved Lead task contains entries such as:
+
+```json
+{
+  "name": "unit tests",
+  "command": "python3 -m unittest -v",
+  "timeout_ms": 120000
+}
+```
+
+After Executor returns, the orchestrator runs each exact command in the test pane, waits for a unique completion marker, captures the exit code, and tees the full output to `.agent-runtime/rounds/<round>/TEST_*.log`.
+
+Unsafe validation commands are rejected before execution, including publishing/destructive Git operations, `sudo`, shutdown/reboot/mkfs, and destructive root deletion patterns.
+
+For OpenFOAM projects, this pane is the preferred place for deterministic work such as `wmake`, solver runs, serial/parallel regression checks, finite-difference probes, and Python post-processing gates.
 
 ## Hard controls
 
-### Reviewer gate
+- **Reviewer gate:** Executor cannot run without `APPROVED`.
+- **Exact-task approval:** the approved task and `test_plan` share one SHA-256 seal.
+- **Lead/Reviewer read-only fingerprint:** if either role changes production files, orchestration aborts and preserves evidence.
+- **No self-certification:** Executor's `PASS` is implementation status, not the authoritative validation verdict.
+- **No automatic reset:** unexpected repository changes are preserved for inspection.
+- **One round at a time:** unattended multi-round automation must be built above this state machine, not by weakening it.
 
-`Executor` is called only when:
+## Protocol regression tests
 
-```text
-review.verdict == "APPROVED"
-```
-
-If the maximum review cycles are exhausted, the round becomes `ESCALATED` and execution is blocked.
-
-### Approval hash
-
-The approved task is canonicalized and hashed. Before Executor is called, the hash is recomputed. Any mismatch aborts execution and requires another review.
-
-### Read-only Lead/Reviewer check
-
-Before and after Lead/Reviewer turns, the orchestrator fingerprints the target Git working tree. If either role changes production files, the workflow aborts. It does **not** auto-reset or destroy evidence.
-
-### No self-certification
-
-- Reviewer decides whether a plan is safe/reasonable to execute.
-- Executor reports what it changed and what tests did.
-- Lead decides what the evidence means after execution.
-- Executor cannot declare the overall algorithm scientifically correct.
-
-## Configuration priority
-
-For runner/model selection:
-
-```text
-CLI override
-    >
-environment variable
-    >
-config/agents.toml
-```
-
-Environment variables:
-
-```text
-AG_LEAD_KIND
-AG_LEAD_MODEL
-AG_REVIEWER_KIND
-AG_REVIEWER_MODEL
-AG_EXECUTOR_KIND
-AG_EXECUTOR_MODEL
-```
-
-Examples:
+Run:
 
 ```bash
-AG_LEAD_KIND=opencode \
-AG_LEAD_MODEL=deepseek/deepseek-v4-pro \
-python scripts/launch.py --project ~/my-project
+uv run --python 3.11 python -m unittest -v tests/test_orchestrate_protocol.py
 ```
 
-## Safety philosophy
-
-The orchestrator never runs `git reset --hard`, `git clean`, `git commit`, or `git push`.
-
-If something unexpected happens, it stops and preserves the working tree for inspection.
-
-See:
-
-- `policies/workflow.md`
-- `policies/git-policy.md`
-- `roles/*.md`
-
-## Current scope
-
-This first version is intentionally conservative:
-
-- persistent interactive agents are managed by Herdr;
-- one round is executed per command;
-- reviewer approval is mandatory;
-- maximum review cycles are bounded;
-- model selection is runtime-configurable;
-- report exchange uses machine-readable JSON sentinels;
-- runtime evidence stays inside the target project's ignored `.agent-runtime/`.
-
-Once this baseline is stable on a small test repository, multi-round automation can be added without changing the role model.
+The tests cover compact JSON parsing, stale-response nonces, literal-newline rejection, test-pane completion-marker safety, and rejection of publishing commands in an approved test plan.
