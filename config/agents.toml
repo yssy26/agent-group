@@ -2,6 +2,9 @@
 max_review_cycles = 3
 prompt_timeout_ms = 300000
 read_lines = 500
+structured_repair_attempts = 1
+test_output_tail_lines = 40
+test_stop_on_failure = true
 runtime_dir = ".agent-runtime"
 workspace_label = "agent-group"
 
@@ -29,7 +32,7 @@ workspace_label = "agent-group"
 
 [roles.lead]
 kind = "codex"
-model = "gpt-5.6"
+model = "gpt-5.6-sol"
 model_flag = "-m"
 profile = "agent-group-lead"
 launch_args = []
